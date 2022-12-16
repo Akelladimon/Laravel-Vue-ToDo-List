@@ -1,0 +1,79 @@
+version: '3'
+services:
+
+    # PHP Service
+    backend:
+        build:
+            context: .
+            dockerfile: ./docker/backend/DockerFile
+        container_name: "backendLaravel"
+        tty: true
+        environment:
+            SERVICE_NAME: backend
+        working_dir: /var/www/backend
+        volumes:
+            - ./backend/:/var/www/backend
+            - ./docker/backend/supervisor/supervisord.conf:/etc/supervisord.conf
+            - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - app-todo
+
+    # Frontend Service
+    frontend:
+        stdin_open: true
+        container_name: "frontendVue"
+        restart: always
+        build:
+            context:  .
+            dockerfile: ./docker/frontend/vue.dockerfile
+        volumes:
+            - ./frontend/:/usr/src/app/frontend
+            - /usr/src/app/frontend/node_modules
+            - ../../frontend:/app:cached
+        environment:
+            - CHOKIDAR_USEPOLLING=true
+        ports:
+            - "8080:8080"
+            - "8081:8081"
+        networks:
+            - app-todo
+
+    # Nginx Service
+    webserver:
+        image: nginx:alpine
+        container_name: "webserverLV"
+        tty: true
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./backend/:/var/www/backend
+            - ./docker/nginx/conf.d/:/etc/nginx/conf.d/
+        networks:
+            - app-todo
+
+    # MySQL Service
+    mysql:
+        image: mysql:8.0
+        container_name: dbl
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: secret
+            MYSQL_DATABASE: laravelVue
+        volumes:
+            - ./docker/mysql/dbdata/:/var/lib/mysql-files/
+            - ./docker/mysql/my.cnf:/etc/mysql/my.cnf
+        networks:
+            - app-todo
+
+# Docker Networks
+networks:
+    app-todo:
+        driver: bridge
+
+volumes:
+    mysql:
+        driver: local
